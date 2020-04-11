@@ -234,7 +234,6 @@ def include_NIST(ttype,db_EXtran,nist_tranlevs):
                             (db_EXtran.loc[:]['Confi']==dummy['Confi'])&
                             (db_EXtran.loc[:]['Termi']==dummy['Termi'])&
                             (db_EXtran.loc[:]['gi']==dummy['gi'])].tolist()
-        if len(idx)==0: nist_notfound.append(i)
         if len(idx)!=0: 
             db_EXtran.at[idx[0],'source']='nist'
             for j in range(nadd):
@@ -339,13 +338,15 @@ for i in range(ntermnist):
     jiterm=(sum_gi-1)/2
     nist_terms.at[i,'NIST(Ryd)']=eiterm
     nist_terms.at[i,'J']=jiterm
-
+print("NIST input OK")
 #####################################################################################################
 # AutoStructure input:
 #####################################################################################################
 ##
 ## - Level data
 ##
+print("Autostructure input:")
+print(" - Levels...")
 ncfgmax=79
 ndum=6
 ncfgs=85
@@ -391,6 +392,7 @@ if len(icheck_levs)!=0: print("missing: ",icheck_levs)
 ##
 ## - Term data
 ##
+print(" - Terms...")
 nterms0=189
 initskip=initskip_olg('terms')
 tcols=[i for i in range(8)]
@@ -437,6 +439,7 @@ if len(icheck_terms)!=0: print("missing: ",icheck_terms)
 ##
 ### From olg file:
 ##
+print(" - Radiative transitions...")
 ttype='E1'
 initskip=initskip_olg(ttype)
 tcols=[i for i in range(4)]
@@ -447,7 +450,7 @@ absolute_Aki(ttype,E1tran)
 insert_LVdata(E1tran)
 compute_fik(ttype,E1tran)
 drop_Ncols(E1tran)
-
+print("   ...E1 OK")
 ttype='E2'
 initskip=initskip_olg(ttype)
 tcols=[i for i in range(5)]
@@ -458,7 +461,7 @@ absolute_Aki(ttype,E2tran)
 insert_LVdata(E2tran)
 # compute_fik(ttype,E2tran)
 drop_Ncols(E2tran)
-
+print("   ...E2 OK")
 ttype='E3'
 initskip=initskip_olg(ttype)
 tcols=[i for i in range(5)]
@@ -469,6 +472,7 @@ absolute_Aki(ttype,E3tran)
 insert_LVdata(E3tran)
 # compute_fik(ttype,E3tran)
 drop_Ncols(E3tran)
+print("   ...E3 OK")
 
 #####################################################################################################
 # >> Create pseudo Database dataframes:
@@ -476,32 +480,38 @@ drop_Ncols(E3tran)
 ##
 ## - Levels
 ##
+print("Creating pseudo-database dfs:")
+print(" - Levels...")
 db_levs=transformsymb_levs('LV',as_levs,nist_cfgs)
 ##
 ## - Terms
 ##
+print(" - Terms...")
 db_terms=transformsymb_levs('T',as_terms,nist_cfgs)
 ##
 ## - Level to level radiative transition 
 ##
+print(" - Radiative transitions...")
 db_E1tran=transformsymb_radtran(E1tran,db_levs)
 db_E2tran=transformsymb_radtran(E2tran,db_levs)
 db_E3tran=transformsymb_radtran(E3tran,db_levs)
 ##
 ### >> Include NIST transition data to radiative transition dataframe
 ##
+print("Include NIST radiative data...")
 include_NIST('E1',db_E1tran,nist_tranlevs)
 include_NIST('E2',db_E2tran,nist_tranlevs)
 include_NIST('E3',db_E3tran,nist_tranlevs)
 ##
 ### Check % relative error of Aki
 ##
+print("Check Aki er%...")
 check_aki=db_E1tran.copy()
 drop_aki=db_E1tran.index[db_E1tran.loc[:]['Aki_NIST']<0][:]
 check_aki.drop(drop_aki,inplace=True)
-check_aki['erp_Aki']=(check_aki['Aki']-check_aki['Aki_NIST'])/check_aki['Aki_NIST']
+check_aki['erp_Aki']=(check_aki['Aki']-check_aki['Aki_NIST'])/check_aki['Aki_NIST']*100.
 avgerp=sum(check_aki['erp_Aki'])/len(check_aki)
-print("average error with NIST =",avgerp)
+print(" => Avg error with NIST = {:.2f}%".format(avgerp))
 plt.plot(check_aki['erp_Aki'],'ko')
 plt.ylabel(r'$E_r\% (A_{ki})$')
 plt.ylim(-10,10)
@@ -509,6 +519,7 @@ plt.savefig('erp_Aki.eps')
 ##
 # Prepare radiative transition data to be printed
 ##
+print("Prepare and print data...")
 print_E1tran=prep_print('E1',db_E1tran)
 print_E2tran=prep_print('E2',db_E2tran)
 print_E3tran=prep_print('E3',db_E3tran)
@@ -523,4 +534,4 @@ db_terms.to_csv('NIST+AS_terms.dat',index=False,sep='\t',header=True,float_forma
 print_E1tran.to_csv('NIST+AS_E1tranlevels.dat',index=False,sep='\t',header=True,float_format='%.8f')
 print_E2tran.to_csv('NIST+AS_E2tranlevels.dat',index=False,sep='\t',header=True,float_format='%.8f')
 print_E3tran.to_csv('NIST+AS_E3tranlevels.dat',index=False,sep='\t',header=True,float_format='%.8f')
-
+print("Print OK")
