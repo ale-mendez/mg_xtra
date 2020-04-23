@@ -4,16 +4,17 @@ import matplotlib.pyplot as plt
 import os
 plt.rcParams['font.size']=16
 
-def initskip_olg(ttype):
+def initskip_olg(ttype,key):
     if ttype=='terms': wgrep="'LIST OF TERMS WITH A WEIGHTED MEAN OVER THE FINE STRUCTURE'"
     if ttype=='E1': wgrep="'E1-DATA'"
-    if ttype=='E2': wgrep="'E2/M1-DATA'"
-    if ttype=='E3': wgrep="'E3/M2-DATA'"
+    if ttype=='E2': wgrep="'E2'"
+    if ttype=='E3': wgrep="'E3'"
     wsys="grep -n -i "+wgrep+" olg > dum.txt"
     os.system(wsys)
     dumline=pd.read_csv("dum.txt",header=None,sep='\s+')
     nrows=len(dumline)
-    iline=dumline.loc[nrows-1][0]
+    if key=='last': iline=dumline.loc[nrows-1][0]
+    if key=='first': iline=dumline.loc[0][0]
     os.system("rm dum.txt")
     return int(iline[0:-1])
 
@@ -113,26 +114,30 @@ def absolute_Aki(ttype,EXtran):
     EXtran['Aki']=sum(EXtran[i] for i in Aki_cols)
     return
 
-def insert_LVdata(EXtran):
+def insert_ASidxdata(key,EXtran,as_data):
     #
     # use k and kp index to insert lv index
     # include statistic weight 
     # replace Eki with observed values
     #
-    colin=['LV_k','gk','LV_i','gi','Eki']
+    colin=[key+'_k','gk',key+'_i','gi','Eki']
     valin=[-999,-999,-999,-999,-999.999]
     idxin=[3,4,5,6,7]
     for i in range(5): EXtran.insert(idxin[i],colin[i],valin[i])
     ntran=len(EXtran)
     for ii in range(ntran):
-        dummy_k=as_levs.loc[as_levs['K']==EXtran.loc[ii]['K']]
-        dummy_i=as_levs.loc[as_levs['K']==EXtran.loc[ii]['KP']]
+        dummy_k=as_data.loc[as_data['K']==EXtran.loc[ii]['K']]
+        dummy_i=as_data.loc[as_data['K']==EXtran.loc[ii]['KP']]
         Ek=dummy_k['Energy'].tolist()[0]
         Ei=dummy_i['Energy'].tolist()[0]
-        EXtran.at[ii,'LV_k']=dummy_k['LV'].tolist()[0]
-        EXtran.at[ii,'LV_i']=dummy_i['LV'].tolist()[0]
-        EXtran.at[ii,'gk']=dummy_k['2J'].tolist()[0]+1
-        EXtran.at[ii,'gi']=dummy_i['2J'].tolist()[0]+1
+        EXtran.at[ii,key+'_k']=dummy_k[key].tolist()[0]
+        EXtran.at[ii,key+'_i']=dummy_i[key].tolist()[0]
+        if key=='LV':
+            EXtran.at[ii,'gk']=dummy_k['2J'].tolist()[0]+1
+            EXtran.at[ii,'gi']=dummy_i['2J'].tolist()[0]+1
+        if key=='T':
+            EXtran.at[ii,'gk']=dummy_k['2S+1'].tolist()[0]*(2*dummy_k['L'].tolist()[0]+1)
+            EXtran.at[ii,'gi']=dummy_i['2S+1'].tolist()[0]*(2*dummy_i['L'].tolist()[0]+1)
         EXtran.at[ii,'Eki']=Ek-Ei
     return
 
@@ -150,7 +155,7 @@ def drop_Ncols(EXtran):
     # drop unnecesary columns
     #
     dropcols=[]
-    cols=['E1-DATA','E2/M1-DATA','E3/M2-DATA','K','KP','A(EK)*SEC','A(MK)*SEC','Eki']
+    cols=['E1-DATA','E2/M1-DATA','E3/M2-DATA','E2-DATA','E3-DATA','K','KP','A(EK)*SEC','A(MK)*SEC','Eki']
     for i in cols:
         if i in EXtran.columns: dropcols.append(i)
     EXtran.drop(dropcols,axis=1,inplace=True)
@@ -182,7 +187,7 @@ def transformsymb_levs(ttype,as_X,nist_cfgs):
     db_X.drop('CF',axis=1,inplace=True)
     return db_X
 
-def transformsymb_radtran(EX_levs,db_levs):
+def transformsymb_radtran(key,EX_levs,db_levs):
     EX_tranlevs=EX_levs.copy()
     # insert columns for configuration, term, multiplicity, L and parity of final and initial state
     colin_k=['Confk','Termk','Sk','Lk','Pk','Ek(Ry)']
@@ -199,15 +204,15 @@ def transformsymb_radtran(EX_levs,db_levs):
     # fill configuration and term symbols of final and initial states
     ntran=len(EX_tranlevs)
     for i in range(ntran):
-        lvk=EX_tranlevs.loc[i]['LV_k']
-        lvi=EX_tranlevs.loc[i]['LV_i']
-        dummyk=db_levs.loc[db_levs[:]['LV']==lvk].squeeze()
-        dummyi=db_levs.loc[db_levs[:]['LV']==lvi].squeeze()
+        lvk=EX_tranlevs.loc[i][key+'_k']
+        lvi=EX_tranlevs.loc[i][key+'_i']
+        dummyk=db_levs.loc[db_levs[:][key]==lvk].squeeze()
+        dummyi=db_levs.loc[db_levs[:][key]==lvi].squeeze()
         for j in range(ncolin):
             EX_tranlevs.at[i,colin_k[j]]=dummyk[coldb[j]]
             EX_tranlevs.at[i,colin_i[j]]=dummyi[coldb[j]]
     # remove AS's CF and LV index
-    EX_tranlevs.drop(['LV_k','LV_i'],axis=1,inplace=True)
+    EX_tranlevs.drop([key+'_k',key+'_i'],axis=1,inplace=True)
     return EX_tranlevs
 
 def include_NIST(ttype,db_EXtran,nist_tranlevs):
@@ -234,6 +239,7 @@ def include_NIST(ttype,db_EXtran,nist_tranlevs):
                             (db_EXtran.loc[:]['Confi']==dummy['Confi'])&
                             (db_EXtran.loc[:]['Termi']==dummy['Termi'])&
                             (db_EXtran.loc[:]['gi']==dummy['gi'])].tolist()
+        if len(idx)==0: nist_notfound.append(i)
         if len(idx)!=0: 
             db_EXtran.at[idx[0],'source']='nist'
             for j in range(nadd):
@@ -268,6 +274,19 @@ def prep_print(ttype,db_EXtran):
     for key,value in format_mapping.items():
         print_EXtran[key]=print_EXtran[key].apply(value.format)
     return print_EXtran
+
+def prep_print_tranterms(ttype,db_EXtran_terms):
+    print_EXtran_terms=db_EXtran_terms.copy()
+    nascols=[['Aki']]
+    if ttype=='E1': nascols.append(['fik','gf'])
+    nascols=[item for i in nascols for item in i ]
+    ncols=len(nascols)
+    eformat=[]
+    for i in range(ncols): eformat.append('{:.3e}')
+    format_mapping=dict(zip(nascols,eformat))
+    for key,value in format_mapping.items():
+        print_EXtran_terms[key]=print_EXtran_terms[key].apply(value.format)
+    return print_EXtran_terms
 
 #####################################################################################################
 # NIST input: 
@@ -394,9 +413,11 @@ if len(icheck_levs)!=0: print("missing: ",icheck_levs)
 ##
 print(" - Terms...")
 nterms0=189
-initskip=initskip_olg('terms')
+initskip=initskip_olg('terms','last')
 tcols=[i for i in range(8)]
 as_terms=pd.read_csv("olg",sep='\s+',skiprows=initskip,header='infer',nrows=nterms0,usecols=tcols)
+# rename energy column
+as_terms.rename(columns={'I':'K',"(EI-E1)/RY":"AS(Ryd)"},inplace=True)
 # drop all terms higher than 3s.20d
 pd_dropterm=as_terms.loc[as_terms.loc[:]['CF']>ncfgmax]
 idx_dropterm=pd_dropterm.index.tolist()
@@ -407,8 +428,6 @@ as_terms.drop(['K*CM','WEIGHTS'],axis=1,inplace=True)
 # determine parity and take absolute value of multiplicity
 determine_parity(as_terms,5)
 as_terms.loc[:]['2S+1']=abs(as_terms.loc[:]['2S+1'])
-# rename energy column
-as_terms.rename(columns={"(EI-E1)/RY":"AS(Ryd)"},inplace=True)
 nterms=len(as_terms)
 ##
 ### >> Include NIST energy terms in AutoStructure terms dataframe
@@ -439,39 +458,87 @@ if len(icheck_terms)!=0: print("missing: ",icheck_terms)
 ##
 ### From olg file:
 ##
-print(" - Radiative transitions...")
+print(" - Level radiative transitions...")
 ttype='E1'
-initskip=initskip_olg(ttype)
+initskip=initskip_olg(ttype,'last')
 tcols=[i for i in range(4)]
 ntranE1_olg=13982
 E1tran=pd.read_csv("olg",sep='\s+',skiprows=initskip-1,header='infer',nrows=ntranE1_olg,usecols=tcols)
 drop_doublexcited(E1tran,pd_droplev)
 absolute_Aki(ttype,E1tran)
-insert_LVdata(E1tran)
+insert_ASidxdata('LV',E1tran,as_levs)
 compute_fik(ttype,E1tran)
 drop_Ncols(E1tran)
 print("   ...E1 OK")
+#
 ttype='E2'
-initskip=initskip_olg(ttype)
+initskip=initskip_olg(ttype,'last')
 tcols=[i for i in range(5)]
 ntranE2_olg=18159
 E2tran=pd.read_csv("olg",sep='\s+',skiprows=initskip-1,header='infer',nrows=ntranE2_olg,usecols=tcols)
 drop_doublexcited(E2tran,pd_droplev)
 absolute_Aki(ttype,E2tran)
-insert_LVdata(E2tran)
+insert_ASidxdata('LV',E2tran,as_levs)
 # compute_fik(ttype,E2tran)
 drop_Ncols(E2tran)
 print("   ...E2 OK")
+#
 ttype='E3'
-initskip=initskip_olg(ttype)
+initskip=initskip_olg(ttype,'last')
 tcols=[i for i in range(5)]
 ntranE3_olg=13165
 E3tran=pd.read_csv("olg",sep='\s+',skiprows=initskip-1,header='infer',nrows=ntranE3_olg,usecols=tcols)
 drop_doublexcited(E3tran,pd_droplev)
 absolute_Aki(ttype,E3tran)
-insert_LVdata(E3tran)
+insert_ASidxdata('LV',E3tran,as_levs)
 # compute_fik(ttype,E3tran)
 drop_Ncols(E3tran)
+print("   ...E3 OK")
+##
+## - Term radiative transition 
+##
+### From olg file:
+##
+print(" - Term radiative transitions...")
+ttype='E1'
+initskip=initskip_olg(ttype,'first')
+tcols=[i for i in range(4)]
+ntranE1_olg=2767
+E1tran_terms=pd.read_csv("olg",sep='\s+',skiprows=initskip-1,header='infer',nrows=ntranE1_olg,usecols=tcols)
+E1tran_terms.rename(columns={'I':'K','IP':'KP'},inplace=True)
+drop_doublexcited(E1tran_terms,pd_dropterm)
+absolute_Aki(ttype,E1tran_terms)
+insert_ASidxdata('T',E1tran_terms,as_terms)
+compute_fik(ttype,E1tran_terms)
+drop_Ncols(E1tran_terms)
+print("   ...E1 OK")
+#
+ttype='E2'
+initskip=initskip_olg(ttype,'first')
+tcols=[i for i in range(4)]
+ntranE2_olg=3162
+E2tran_terms=pd.read_csv("olg",sep='\s+',skiprows=initskip-1,header='infer',nrows=ntranE2_olg,usecols=tcols)
+E2tran_terms.rename(columns={'I':'K','IP':'KP'},inplace=True)
+drop_doublexcited(E2tran_terms,pd_dropterm)
+ttype='E1' # actually is E2 but olg prints it like E1 for LS transition
+absolute_Aki(ttype,E2tran_terms)
+insert_ASidxdata('T',E2tran_terms,as_terms)
+# compute_fik(ttype,E2tran_terms)
+drop_Ncols(E2tran_terms)
+print("   ...E2 OK")
+#
+ttype='E3'
+initskip=initskip_olg(ttype,'first')
+tcols=[i for i in range(4)]
+ntranE3_olg=1335
+E3tran_terms=pd.read_csv("olg",sep='\s+',skiprows=initskip-1,header='infer',nrows=ntranE3_olg,usecols=tcols)
+E3tran_terms.rename(columns={'I':'K','IP':'KP'},inplace=True)
+drop_doublexcited(E3tran_terms,pd_dropterm)
+ttype='E1' # actually is E2 but olg prints it like E1 for LS transition
+absolute_Aki(ttype,E3tran_terms)
+insert_ASidxdata('T',E3tran_terms,as_terms)
+# compute_fik(ttype,E3tran_terms)
+drop_Ncols(E3tran_terms)
 print("   ...E3 OK")
 
 #####################################################################################################
@@ -491,10 +558,10 @@ db_terms=transformsymb_levs('T',as_terms,nist_cfgs)
 ##
 ## - Level to level radiative transition 
 ##
-print(" - Radiative transitions...")
-db_E1tran=transformsymb_radtran(E1tran,db_levs)
-db_E2tran=transformsymb_radtran(E2tran,db_levs)
-db_E3tran=transformsymb_radtran(E3tran,db_levs)
+print(" - Level radiative transitions...")
+db_E1tran=transformsymb_radtran('LV',E1tran,db_levs)
+db_E2tran=transformsymb_radtran('LV',E2tran,db_levs)
+db_E3tran=transformsymb_radtran('LV',E3tran,db_levs)
 ##
 ### >> Include NIST transition data to radiative transition dataframe
 ##
@@ -517,12 +584,22 @@ plt.ylabel(r'$E_r\% (A_{ki})$')
 plt.ylim(-10,10)
 plt.savefig('erp_Aki.eps')
 ##
+## - Term to term radiative transition 
+##
+print(" - Term radiative transitions...")
+db_E1tran_terms=transformsymb_radtran('T',E1tran_terms,db_terms)
+db_E2tran_terms=transformsymb_radtran('T',E2tran_terms,db_terms)
+db_E3tran_terms=transformsymb_radtran('T',E3tran_terms,db_terms)
+##
 # Prepare radiative transition data to be printed
 ##
 print("Prepare and print data...")
 print_E1tran=prep_print('E1',db_E1tran)
 print_E2tran=prep_print('E2',db_E2tran)
 print_E3tran=prep_print('E3',db_E3tran)
+print_E1tran_terms=prep_print_tranterms('E1',db_E1tran_terms)
+print_E2tran_terms=prep_print_tranterms('E2',db_E2tran_terms)
+print_E3tran_terms=prep_print_tranterms('E3',db_E3tran_terms)
 ##
 ## >> Print pseudo Database for level and term energy data
 ##
@@ -534,4 +611,15 @@ db_terms.to_csv('NIST+AS_terms.dat',index=False,sep='\t',header=True,float_forma
 print_E1tran.to_csv('NIST+AS_E1tranlevels.dat',index=False,sep='\t',header=True,float_format='%.8f')
 print_E2tran.to_csv('NIST+AS_E2tranlevels.dat',index=False,sep='\t',header=True,float_format='%.8f')
 print_E3tran.to_csv('NIST+AS_E3tranlevels.dat',index=False,sep='\t',header=True,float_format='%.8f')
+
+print_E1tran_terms.to_csv('AS_E1tranterms.dat',index=False,sep='\t',header=True,float_format='%.8f')
+print_E2tran_terms.to_csv('AS_E2tranterms.dat',index=False,sep='\t',header=True,float_format='%.8f')
+print_E3tran_terms.to_csv('AS_E3tranterms.dat',index=False,sep='\t',header=True,float_format='%.8f')
 print("Print OK")
+
+print(" Level to level:")
+print("E1=",len(print_E1tran),"E2=",len(print_E2tran),"E3=",len(print_E3tran))
+print("total=",len(print_E3tran)+len(print_E2tran)+len(print_E1tran))
+print("\n Term to term:")
+print("E1=",len(print_E1tran_terms),"E2=",len(print_E2tran_terms),"E3=",len(print_E3tran_terms))
+print("total=",len(print_E3tran_terms)+len(print_E2tran_terms)+len(print_E1tran_terms))
