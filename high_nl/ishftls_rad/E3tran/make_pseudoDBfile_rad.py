@@ -239,7 +239,6 @@ def include_NIST(ttype,db_EXtran,nist_tranlevs):
                             (db_EXtran.loc[:]['Confi']==dummy['Confi'])&
                             (db_EXtran.loc[:]['Termi']==dummy['Termi'])&
                             (db_EXtran.loc[:]['gi']==dummy['gi'])].tolist()
-        if len(idx)==0: nist_notfound.append(i)
         if len(idx)!=0: 
             db_EXtran.at[idx[0],'source']='nist'
             for j in range(nadd):
@@ -565,20 +564,20 @@ db_E3tran=transformsymb_radtran('LV',E3tran,db_levs)
 ##
 ### >> Include NIST transition data to radiative transition dataframe
 ##
-print("Include NIST radiative data...")
+print("   Include NIST radiative data...")
 include_NIST('E1',db_E1tran,nist_tranlevs)
 include_NIST('E2',db_E2tran,nist_tranlevs)
 include_NIST('E3',db_E3tran,nist_tranlevs)
 ##
 ### Check % relative error of Aki
 ##
-print("Check Aki er%...")
+print("   Check Aki er%...")
 check_aki=db_E1tran.copy()
 drop_aki=db_E1tran.index[db_E1tran.loc[:]['Aki_NIST']<0][:]
 check_aki.drop(drop_aki,inplace=True)
 check_aki['erp_Aki']=(check_aki['Aki']-check_aki['Aki_NIST'])/check_aki['Aki_NIST']*100.
 avgerp=sum(check_aki['erp_Aki'])/len(check_aki)
-print(" => Avg error with NIST = {:.2f}%".format(avgerp))
+print("    => Avg error with NIST = {:.2f}%".format(avgerp))
 plt.plot(check_aki['erp_Aki'],'ko')
 plt.ylabel(r'$E_r\% (A_{ki})$')
 plt.ylim(-10,10)
@@ -617,9 +616,9 @@ print_E2tran_terms.to_csv('AS_E2tranterms.dat',index=False,sep='\t',header=True,
 print_E3tran_terms.to_csv('AS_E3tranterms.dat',index=False,sep='\t',header=True,float_format='%.8f')
 print("Print OK")
 
-print(" Level to level:")
-print("E1=",len(print_E1tran),"E2=",len(print_E2tran),"E3=",len(print_E3tran))
+print("\n Level to level:")
+print("E1 =",len(print_E1tran),"E2 =",len(print_E2tran),"E3 =",len(print_E3tran))
 print("total=",len(print_E3tran)+len(print_E2tran)+len(print_E1tran))
 print("\n Term to term:")
-print("E1=",len(print_E1tran_terms),"E2=",len(print_E2tran_terms),"E3=",len(print_E3tran_terms))
+print("E1 =",len(print_E1tran_terms),"E2 =",len(print_E2tran_terms),"E3 =",len(print_E3tran_terms))
 print("total=",len(print_E3tran_terms)+len(print_E2tran_terms)+len(print_E1tran_terms))
