@@ -1,8 +1,10 @@
 .ipynb_checkpoints/*
-de_isfhtls
-de_isfhtls_nmeta1
+de_ishftls
+de_ishftls_nmeta1
 de_noshftls
 de_noshftls_nmeta1
-ener_ishfic
+ener_ishftic
+ener_ishftls
 ener_noshft
 rad_ishftls
+write_shft
