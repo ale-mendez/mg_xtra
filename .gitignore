@@ -1,4 +1,5 @@
 .ipynb_checkpoints/*
+*__pycache__*
 de_ishftls
 de_ishftls_nmeta1
 de_noshftls
